@@ -374,7 +374,7 @@ class DataSplitter:
         combo_ood = self.get_perts_from_genes(ood_genes, pert_list, "combo")
         pert_test.extend(unseen_single)
 
-         here only keeps the seen 0, since seen 1 is tackled above
+        # here only keeps the seen 0, since seen 1 is tackled above
         combo_seen0 = [
             x
             for x in combo_ood

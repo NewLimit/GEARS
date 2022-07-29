@@ -366,6 +366,8 @@ def uncertainty_loss_fct(
 
     return losses / (len(set(perts)))
 
+    return losses / (len(set(perts)))
+
 
 def loss_fct(
     pred, y, perts, ctrl=None, direction_lambda=1e-3, dict_filter=None

@@ -153,7 +153,7 @@ def non_zero_analysis(adata, test_res):
 
     pert_metric = {}
 
-    ## in silico modeling and upperbounding
+    # in silico modeling and upperbounding
     pert2pert_full_id = dict(adata.obs[["condition", "condition_name"]].values)
     # geneid2name = dict(zip(adata.var.index.values, adata.var["gene_name"]))
     geneid2idx = dict(
