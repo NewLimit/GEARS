@@ -168,6 +168,8 @@ class GEARS_Model(torch.nn.Module):
             else:
                 pert_track[j] = pert_global_emb[pert_index[1][i]]
 
+        base_emb_ = torch.zeros_like(base_emb)
+
         if len(list(pert_track.values())) > 0:
             if len(list(pert_track.values())) == 1:
                 # circumvent when batch size = 1 with single perturbation and cannot feed into MLP
@@ -176,7 +178,9 @@ class GEARS_Model(torch.nn.Module):
                 emb_total = self.pert_fuse(torch.stack(list(pert_track.values())))
 
             for idx, j in enumerate(pert_track.keys()):
-                base_emb[j] += emb_total[idx]
+                base_emb_[j] += emb_total[idx]
+
+        base_emb = base_emb + base_emb_
 
         base_emb = base_emb.reshape(num_graphs * self.num_genes, -1)
 
