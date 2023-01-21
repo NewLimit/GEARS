@@ -1,13 +1,13 @@
 import os
 import pickle
 import warnings
+from pathlib import Path
 
 import numpy as np
 import scanpy as sc
 import torch
 from torch_geometric.data import Data, DataLoader
 from tqdm import tqdm
-import pandas as pd
 
 from .data_utils import DataSplitter, get_DE_genes, get_dropout_non_zero_genes
 from .utils import print_sys, zip_data_download_wrapper
@@ -35,16 +35,22 @@ class PertData:
             gene2go = pickle.load(f)
 
         self.gi_go = gi_go
+
         if gene_path is not None:
             gene_path = gene_path
         elif self.gi_go:
             gene_path = "/dfs/user/kexinh/gears2/data/pert_genes_gi.pkl"
         else:
             gene_path = "/dfs/user/kexinh/gears2/data/essential_all_data_pert_genes.pkl"
-        with open(gene_path, "rb") as f:
-            essential_genes = pickle.load(f)
 
-        gene2go = {i: gene2go[i] for i in essential_genes if i in gene2go}
+        if Path(gene_path).exists():
+
+            with open(gene_path, "rb") as f:
+                essential_genes = pickle.load(f)
+
+            gene2go = {i: gene2go[i] for i in essential_genes if i in gene2go}
+        else:
+            print_sys("No gene path provided, using all genes")
 
         self.pert_names = np.unique(list(gene2go.keys()))
         self.node_map_pert = {x: it for it, x in enumerate(self.pert_names)}

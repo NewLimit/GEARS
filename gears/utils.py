@@ -225,10 +225,10 @@ def get_similarity_network(
         )
     elif network_type == "go":
         # df_jaccard = get_go_auto(gene_list, data_path, data_name)
-        if gi_go:
-            df_jaccard = pd.read_csv("/dfs/user/kexinh/gears2/go_essential_gi.csv")
-        else:
-            df_jaccard = pd.read_csv("/dfs/user/kexinh/gears2/go_essential_all.csv")
+        # if gi_go:
+        #     df_jaccard = pd.read_csv("/dfs/user/kexinh/gears2/go_essential_gi.csv")
+        # else:
+        #     df_jaccard = pd.read_csv("/dfs/user/kexinh/gears2/go_essential_all.csv")
 
         if dataset is not None:
             df_jaccard = pd.read_csv(dataset)

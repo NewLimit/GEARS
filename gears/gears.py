@@ -126,12 +126,12 @@ class GEARS:
         num_go_gnn_layers=1,
         num_gene_gnn_layers=1,
         decoder_hidden_size=16,
-        num_similar_genes_go_graph=20,
-        num_similar_genes_co_express_graph=20,
+        num_similar_genes_go_graph=5,  # H_gene
+        num_similar_genes_co_express_graph=20,  # H_pert
         coexpress_threshold=0.4,
-        uncertainty=False,
+        uncertainty=True,
         uncertainty_reg=1,
-        direction_lambda=1e-1,
+        direction_lambda=1e-1,  # Lambda
         G_go=None,
         G_go_weight=None,
         G_coexpress=None,
