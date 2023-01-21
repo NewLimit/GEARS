@@ -68,9 +68,7 @@ def dataverse_download(url, save_path):
         response = requests.get(url, stream=True)
         total_size_in_bytes = int(response.headers.get("content-length", 0))
         block_size = 1024
-        progress_bar = tqdm(
-            total=total_size_in_bytes, unit="iB", unit_scale=True
-        )
+        progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
         with open(save_path, "wb") as file:
             for data in response.iter_content(block_size):
                 progress_bar.update(len(data))
@@ -98,12 +96,8 @@ def get_go_auto(gene_list, data_path, data_name):
     else:
         ## download gene2go.pkl
         if not os.path.exists(os.path.join(data_path, "gene2go.pkl")):
-            server_path = (
-                "https://dataverse.harvard.edu/api/access/datafile/6153417"
-            )
-            dataverse_download(
-                server_path, os.path.join(data_path, "gene2go.pkl")
-            )
+            server_path = "https://dataverse.harvard.edu/api/access/datafile/6153417"
+            dataverse_download(server_path, os.path.join(data_path, "gene2go.pkl"))
         with open(os.path.join(data_path, "gene2go.pkl"), "rb") as f:
             gene2go = pickle.load(f)
 
@@ -137,15 +131,11 @@ def get_go_auto(gene_list, data_path, data_name):
 
 
 def get_go(df_gene2go):
-    df_gene2go["Entry name"] = df_gene2go["Entry name"].apply(
-        lambda x: x.split("_")[0]
-    )
+    df_gene2go["Entry name"] = df_gene2go["Entry name"].apply(lambda x: x.split("_")[0])
     df_gene2go = df_gene2go[df_gene2go["Gene ontology IDs"].notnull()]
     df_gene2go = df_gene2go.rename(
         columns={
-            [i for i in df_gene2go.columns.values if "yourlist" in i][
-                0
-            ]: "gene_id"
+            [i for i in df_gene2go.columns.values if "yourlist" in i][0]: "gene_id"
         }
     )
     geneid2go = dict(df_gene2go[["gene_id", "Gene ontology IDs"]].values)
@@ -217,6 +207,8 @@ def get_similarity_network(
     seed,
     train_gene_set_size,
     set2conditions,
+    gi_go=False,
+    dataset=None,
 ):
 
     if network_type == "co-express":
@@ -232,7 +224,15 @@ def get_similarity_network(
             set2conditions,
         )
     elif network_type == "go":
-        df_jaccard = get_go_auto(gene_list, data_path, data_name)
+        # df_jaccard = get_go_auto(gene_list, data_path, data_name)
+        if gi_go:
+            df_jaccard = pd.read_csv("/dfs/user/kexinh/gears2/go_essential_gi.csv")
+        else:
+            df_jaccard = pd.read_csv("/dfs/user/kexinh/gears2/go_essential_all.csv")
+
+        if dataset is not None:
+            df_jaccard = pd.read_csv(dataset)
+
         df_out = (
             df_jaccard.groupby("target")
             .apply(lambda x: x.nlargest(k + 1, ["importance"]))
@@ -275,11 +275,7 @@ def get_coexpression_network_from_train(
         idx2gene = dict(zip(range(len(gene_list)), gene_list))
         X = adata.X
         train_perts = set2conditions["train"]
-        X_tr = X[
-            np.isin(
-                adata.obs.condition, [i for i in train_perts if "ctrl" in i]
-            )
-        ]
+        X_tr = X[np.isin(adata.obs.condition, [i for i in train_perts if "ctrl" in i])]
         gene_list = adata.var["gene_name"].values
 
         X_tr = X_tr.toarray()
@@ -294,9 +290,7 @@ def get_coexpression_network_from_train(
         for i in range(out_sort_idx.shape[0]):
             target = idx2gene[i]
             for j in range(out_sort_idx.shape[1]):
-                df_g.append(
-                    (idx2gene[out_sort_idx[i, j]], target, out_sort_val[i, j])
-                )
+                df_g.append((idx2gene[out_sort_idx[i, j]], target, out_sort_val[i, j]))
 
         df_g = [i for i in df_g if i[2] > threshold]
         df_co_expression = pd.DataFrame(df_g).rename(
@@ -306,15 +300,22 @@ def get_coexpression_network_from_train(
         return df_co_expression
 
 
+def filter_pert_in_go(condition, pert_names):
+    if condition == "ctrl":
+        return True
+    else:
+        cond1 = condition.split("+")[0]
+        cond2 = condition.split("+")[1]
+        num_ctrl = (cond1 == "ctrl") + (cond2 == "ctrl")
+        num_in_perts = (cond1 in pert_names) + (cond2 in pert_names)
+        if num_ctrl + num_in_perts == 2:
+            return True
+        else:
+            return False
+
+
 def uncertainty_loss_fct(
-    pred,
-    logvar,
-    y,
-    perts,
-    reg=0.1,
-    ctrl=None,
-    direction_lambda=1e-3,
-    dict_filter=None,
+    pred, logvar, y, perts, reg=0.1, ctrl=None, direction_lambda=1e-3, dict_filter=None
 ):
     gamma = 2
     perts = np.array(perts)
@@ -369,9 +370,7 @@ def uncertainty_loss_fct(
     return losses / (len(set(perts)))
 
 
-def loss_fct(
-    pred, y, perts, ctrl=None, direction_lambda=1e-3, dict_filter=None
-):
+def loss_fct(pred, y, perts, ctrl=None, direction_lambda=1e-3, dict_filter=None):
     gamma = 2
     perts = np.array(perts)
     losses = torch.tensor(0.0, requires_grad=True).to(pred.device)
@@ -389,9 +388,7 @@ def loss_fct(
             y_p = y[pert_idx]
 
         losses += (
-            torch.sum((pred_p - y_p) ** (2 + gamma))
-            / pred_p.shape[0]
-            / pred_p.shape[1]
+            torch.sum((pred_p - y_p) ** (2 + gamma)) / pred_p.shape[0] / pred_p.shape[1]
         )
 
         ## direction loss
@@ -432,12 +429,13 @@ def print_sys(s):
 def create_cell_graph_for_prediction(X, pert_idx, pert_gene):
 
     # If perturbations will be represented as node features
-    pert_feats = np.zeros(len(X))
-    for p in pert_idx:
-        pert_feats[int(np.abs(p))] = np.sign(p)
-    feature_mat = torch.Tensor(np.vstack([X, pert_feats])).T
-
-    return Data(x=feature_mat, pert=pert_gene)
+    # pert_feats = np.zeros(len(X))
+    # for p in pert_idx:
+    #    pert_feats[int(np.abs(p))] = np.sign(p)
+    # feature_mat = torch.Tensor(np.vstack([X, pert_feats])).T
+    if pert_idx is None:
+        pert_idx = [-1]
+    return Data(x=torch.Tensor(X).T, pert_idx=pert_idx, pert=pert_gene)
 
 
 def create_cell_graph_dataset_for_prediction(
@@ -447,13 +445,10 @@ def create_cell_graph_dataset_for_prediction(
     # Get the indices (and signs) of applied perturbation
     pert_idx = [np.where(p == np.array(gene_names))[0][0] for p in pert_gene]
 
-    Xs = ctrl_adata[
-        np.random.randint(0, len(ctrl_adata), num_samples), :
-    ].X.toarray()
+    Xs = ctrl_adata[np.random.randint(0, len(ctrl_adata), num_samples), :].X.toarray()
     # Create cell graphs
     cell_graphs = [
-        create_cell_graph_for_prediction(X, pert_idx, pert_gene).to(device)
-        for X in Xs
+        create_cell_graph_for_prediction(X, pert_idx, pert_gene).to(device) for X in Xs
     ]
     return cell_graphs
 
@@ -483,9 +478,7 @@ def get_coeffs(singles_expr, first_expr, second_expr, double_expr):
     results["dcor_singles"] = distance_correlation(first_expr, second_expr)
     results["dcor_first"] = distance_correlation(first_expr, double_expr)
     results["dcor_second"] = distance_correlation(second_expr, double_expr)
-    results["corr_fit"] = np.corrcoef(Zts.flatten(), double_expr.flatten())[
-        0, 1
-    ]
+    results["corr_fit"] = np.corrcoef(Zts.flatten(), double_expr.flatten())[0, 1]
     results["dominance"] = np.abs(np.log10(results["c1"] / results["c2"]))
     results["eq_contr"] = np.min(
         [results["dcor_first"], results["dcor_second"]]
@@ -507,9 +500,7 @@ def get_GI_params(preds, combo):
 def get_GI_genes_idx(adata, GI_gene_file):
     # Genes used for linear model fitting
     GI_genes = np.load(GI_gene_file, allow_pickle=True)
-    GI_genes_idx = np.where(
-        [g in GI_genes for g in adata.var.gene_name.values]
-    )[0]
+    GI_genes_idx = np.where([g in GI_genes for g in adata.var.gene_name.values])[0]
 
     return GI_genes_idx
 
