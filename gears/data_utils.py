@@ -52,7 +52,7 @@ def rank_genes_groups_by_cov(
         return gene_dict
 
 
-def get_DE_genes(adata):
+def get_DE_genes(adata, skip_calc_de):
     adata.obs.loc[:, "dose_val"] = adata.obs.condition.apply(
         lambda x: "1+1" if len(x.split("+")) == 2 else "1"
     )
@@ -62,14 +62,17 @@ def get_DE_genes(adata):
     adata.obs.loc[:, "condition_name"] = adata.obs.apply(
         lambda x: "_".join([x.cell_type, x.condition, x.dose_val]), axis=1
     )
-    rank_genes_groups_by_cov(
-        adata,
-        groupby="condition_name",
-        covariate="cell_type",
-        control_group="ctrl_1",
-        n_genes=len(adata.var),
-        key_added="rank_genes_groups_cov_all",
-    )
+
+    adata.obs = adata.obs.astype("category")
+    if not skip_calc_de:
+        rank_genes_groups_by_cov(
+            adata,
+            groupby="condition_name",
+            covariate="cell_type",
+            control_group="ctrl_1",
+            n_genes=len(adata.var),
+            key_added="rank_genes_groups_cov_all",
+        )
     return adata
 
 
@@ -85,9 +88,9 @@ def get_dropout_non_zero_genes(adata):
     for i, j in conditions2index.items():
         condition2mean_expression[i] = np.mean(adata.X[j], axis=0)
     pert_list = np.array(list(condition2mean_expression.keys()))
-    mean_expression = np.array(
-        list(condition2mean_expression.values())
-    ).reshape(len(adata.obs.condition.unique()), adata.X.toarray().shape[1])
+    mean_expression = np.array(list(condition2mean_expression.values())).reshape(
+        len(adata.obs.condition.unique()), adata.X.toarray().shape[1]
+    )
     ctrl = mean_expression[np.where(pert_list == "ctrl")[0]]
 
     # in silico modeling and upperbounding
@@ -166,9 +169,7 @@ class DataSplitter:
         Note: split categories are train, val, test
         """
         np.random.seed(seed=seed)
-        unique_perts = [
-            p for p in self.adata.obs["condition"].unique() if p != "ctrl"
-        ]
+        unique_perts = [p for p in self.adata.obs["condition"].unique() if p != "ctrl"]
 
         if self.split_type == "simulation":
             train, test, test_subgroup = self.get_simulation_split(
@@ -179,9 +180,7 @@ class DataSplitter:
                 test_perts,
                 only_test_set_perts,
             )
-            train, val, val_subgroup = self.get_simulation_split(
-                train, 0.9, 0.9, seed
-            )
+            train, val, val_subgroup = self.get_simulation_split(train, 0.9, 0.9, seed)
             # adding back ctrl to train...
             train.append("ctrl")
         elif self.split_type == "simulation_single":
@@ -255,9 +254,7 @@ class DataSplitter:
             )
 
             if test_set_perts is not None:
-                num_overlap = len(
-                    np.intersect1d(train_gene_candidates, test_set_perts)
-                )
+                num_overlap = len(np.intersect1d(train_gene_candidates, test_set_perts))
                 train_gene_candidates = train_gene_candidates[
                     ~np.isin(train_gene_candidates, test_set_perts)
                 ]
@@ -278,9 +275,7 @@ class DataSplitter:
         pert_single_train = self.get_perts_from_genes(
             train_gene_candidates, pert_list, "single"
         )
-        unseen_single = self.get_perts_from_genes(
-            ood_genes, pert_list, "single"
-        )
+        unseen_single = self.get_perts_from_genes(ood_genes, pert_list, "single")
         assert len(unseen_single) + len(pert_single_train) == len(pert_list)
 
         return (
@@ -317,9 +312,7 @@ class DataSplitter:
             )
 
             if test_set_perts is not None:
-                num_overlap = len(
-                    np.intersect1d(train_gene_candidates, test_set_perts)
-                )
+                num_overlap = len(np.intersect1d(train_gene_candidates, test_set_perts))
                 train_gene_candidates = train_gene_candidates[
                     ~np.isin(train_gene_candidates, test_set_perts)
                 ]
@@ -349,8 +342,7 @@ class DataSplitter:
         combo_seen1 = [
             x
             for x in pert_combo
-            if len([t for t in x.split("+") if t in train_gene_candidates])
-            == 1
+            if len([t for t in x.split("+") if t in train_gene_candidates]) == 1
         ]
         pert_test.extend(combo_seen1)
 
@@ -368,9 +360,7 @@ class DataSplitter:
         pert_train.extend(pert_combo_train)
 
         # unseen single
-        unseen_single = self.get_perts_from_genes(
-            ood_genes, pert_list, "single"
-        )
+        unseen_single = self.get_perts_from_genes(ood_genes, pert_list, "single")
         combo_ood = self.get_perts_from_genes(ood_genes, pert_list, "combo")
         pert_test.extend(unseen_single)
 
@@ -378,8 +368,7 @@ class DataSplitter:
         combo_seen0 = [
             x
             for x in combo_ood
-            if len([t for t in x.split("+") if t in train_gene_candidates])
-            == 0
+            if len([t for t in x.split("+") if t in train_gene_candidates]) == 0
         ]
         pert_test.extend(combo_seen0)
         assert len(combo_seen1) + len(combo_seen0) + len(unseen_single) + len(
@@ -423,9 +412,7 @@ class DataSplitter:
         # Only single unseen genes (in test set)
         # Train contains both single and combos
         if self.split_type == "single" or self.split_type == "single_only":
-            test_perts = self.get_perts_from_genes(
-                test_pert_genes, pert_list, "single"
-            )
+            test_perts = self.get_perts_from_genes(test_pert_genes, pert_list, "single")
             if self.split_type == "single_only":
                 # Discard all combos
                 hold_out = combo_perts
@@ -452,13 +439,7 @@ class DataSplitter:
                     hold_out = [
                         t
                         for t in combo_perts
-                        if len(
-                            [
-                                t
-                                for t in t.split("+")
-                                if t not in test_pert_genes
-                            ]
-                        )
+                        if len([t for t in t.split("+") if t not in test_pert_genes])
                         > 0
                     ]
                 combo_perts = [c for c in combo_perts if c not in hold_out]
@@ -481,13 +462,7 @@ class DataSplitter:
                     hold_out = [
                         t
                         for t in combo_perts
-                        if len(
-                            [
-                                t
-                                for t in t.split("+")
-                                if t not in test_pert_genes
-                            ]
-                        )
+                        if len([t for t in t.split("+") if t not in test_pert_genes])
                         > 1
                     ]
                 combo_perts = [c for c in combo_perts if c not in hold_out]
@@ -507,9 +482,7 @@ class DataSplitter:
                 )
 
         train_perts = [
-            p
-            for p in pert_list
-            if (p not in test_perts) and (p not in hold_out)
+            p for p in pert_list if (p not in test_perts) and (p not in hold_out)
         ]
         return train_perts, test_perts
 
@@ -518,9 +491,7 @@ class DataSplitter:
         Returns all single/combo/both perturbations that include a gene
         """
 
-        single_perts = [
-            p for p in pert_list if ("ctrl" in p) and (p != "ctrl")
-        ]
+        single_perts = [p for p in pert_list if ("ctrl" in p) and (p != "ctrl")]
         combo_perts = [p for p in pert_list if "ctrl" not in p]
 
         perts = []
