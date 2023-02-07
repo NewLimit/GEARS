@@ -1,5 +1,9 @@
 # GEARS: Predicting transcriptional outcomes of novel multi-gene perturbations
 
+Update: 20230207
+CSK got GEARs API running by following the process denoted in this notion page. https://www.notion.so/newlimit/Getting-GEARs-API-running-ac46034cc38842609cf264ac6b816f11
+
+
 This repository hosts the official implementation of GEARS, a method that can predict transcriptional response to both single and multi-gene perturbations using single-cell RNA-sequencing data from perturbational screens. 
 
 
