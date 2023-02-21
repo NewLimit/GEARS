@@ -12,7 +12,25 @@ This repository hosts the official implementation of GEARS, a method that can pr
 
 ### Installation 
 
-Install [PyG](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html), and then do `pip install cell-gears`.
+```
+conda create --name test_gears python=3.10
+conda activate test_gears
+
+# specificy one version of TORCH and CUDA
+TORCH=1.13.0
+CUDA=cu117
+
+# install pyG
+pip install pyg-lib torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
+pip install torch-geometric
+
+# now install GEARs
+# install GEARs
+cd ..
+git clone git@github.com:NewLimit/GEARS.git
+cd GEARS
+pip install -e .
+```
 
 ### Core API Interface
 

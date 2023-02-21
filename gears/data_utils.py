@@ -3,11 +3,91 @@ import warnings
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from scipy.sparse import csr_matrix
 
 from .utils import parse_any_pert
 
 sc.settings.verbosity = 0
 warnings.filterwarnings("ignore")
+
+
+def add_in_missing_genes_for_perturbations(adata, perturb_delimiter):
+    """ GEARs requires that all perturbations have a corresponding gene
+    in adata.var. For perturbations with no gene, this function adds a
+    vector of zeros to adata.X for that gene and adds the gene to adata.var.
+
+    Paramters
+    #########
+
+    adata: anndata.Anndata
+    peturb_delimiter: str
+        String of the delimiter between pertubatoins in combos
+        e.g. "+" if perturbation code listed as "TF_A+TF_B"
+    """
+
+    adata.var = adata.var.drop(columns=adata.var.columns.values)
+    perturbations = []
+    conditions = adata.obs.condition.unique()
+    for cond in conditions:
+        for p in cond.split(perturb_delimiter):
+            perturbations.append(p)
+    perturbations = np.unique(perturbations)
+
+    missing_perturbations = perturbations[np.isin(perturbations,
+                                                  adata.var.index,invert=True)]
+        
+    dummyX = np.zeros((adata.n_obs, len(missing_perturbations)))
+
+    dummy_var = pd.DataFrame(pd.Series(missing_perturbations))
+    dummy_var.index = dummy_var.iloc[:, 0]
+    dummy_var = dummy_var.drop(columns=dummy_var.columns.values)
+    dummy_var.index.name = None
+
+    dummy_adata = sc.AnnData(dummyX, adata.obs, dummy_var)
+    newX = np.hstack([adata.X, dummy_adata.X])
+    new_var = pd.concat([adata.var, dummy_adata.var])
+    adata = sc.AnnData(newX, adata.obs, new_var)
+
+    return adata
+
+
+def update_adata_for_gears(adata, control_name, cell_type):
+    """
+    Updates adata to required formatting for
+    GEARS PertData.new_data_process() method
+
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData object containing raw data
+    control_name : str
+        Name of control perturbation in adata.obs.condition
+    cell_type : str
+        Name of cell type used in experiment
+    """
+
+    # Specify gene_name in var and cell_type in obs
+    adata.var['gene_name'] = adata.var.index.values
+    adata.obs['cell_type'] = cell_type
+
+    # Change name of control perturbation to 'ctrl'
+    adata.obs.control_perturbation = [control_name]
+    adata.obs.condition = adata.obs.condition.astype(str)
+    for i in range(adata.n_obs):    
+        if adata.obs.condition.iloc[i] == control_name:
+            adata.obs.condition.iloc[i] = 'ctrl'
+    adata.obs.condition = adata.obs.condition.astype('category')
+
+    # Remove unnecessary columns from obs and var to
+    # solve weird & opaque errors
+    adata.obs = adata.obs[['condition','cell_type']]
+    adata.var = adata.var[['gene_name']]
+
+    # If adata.X is a numpy array, convert to csr_matrix
+    if isinstance(adata.X, np.ndarray):
+        adata.X = csr_matrix(adata.X)
+
+    return adata
 
 
 def rank_genes_groups_by_cov(
